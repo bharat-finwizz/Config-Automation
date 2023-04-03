@@ -10,9 +10,20 @@ import pandas as pd
 mydict = {}
 mylist = []
 
-df = pd.read_excel('test.xlsx', sheet_name='fromtenure')
+# change sheet and excel name accordingly make sure it has columns name according to the main excel 
+df = pd.read_excel('test.xlsx', sheet_name='dropdown')
 
-        # Iterate over the columns and their rows that start with "other_details"
+# Note- I have hard coded the bank name in lender mapping page while selecting please change it accordingly to your bank
+# await page.locator('[id="banklist_div"]').select_option(label="Aditya Birla Finance Ltd")
+# Count variable may vary. Take a look at it.
+
+# variable meanings
+# desc - means description for entereing the String value dropdown
+# desc2 - means description for for intereger values eg(tenture months less than 60 months)
+# flag variables is for identifing if the dropdown values are string or integer and select accordingly
+
+
+# Iterate over the columns and their rows that start with "other_details and applicant1*other_details*
 for column in df.columns:
     if column.startswith('other_details*') or column.startswith('applicant1*other_details*'):
         if not df[column].isnull().all():
@@ -38,7 +49,7 @@ for column in df.columns:
 with open('my_data.json', 'w') as file:
     json.dump(mydict, file) 
     file.close()
-                                         
+print("All keys and value are stored in my_data.json")                                       
 
 async def run(playwright: Playwright) -> None:
         browser = await playwright.chromium.launch(headless=False)
@@ -55,6 +66,7 @@ async def run(playwright: Playwright) -> None:
         await sleep(1)
         
         count =1
+        flag = False
 
         for key, values in mydict.items():
                 print("Key:", key)
@@ -63,6 +75,7 @@ async def run(playwright: Playwright) -> None:
                         await page.locator('text=Code Master').click()
                         await page.locator('[class="btn btn-primary pull-right add_user"]').click()
                         await page.locator('[placeholder="Group Code"]').fill(key)
+                        
                         desc = key.replace('_', ' ').title()
                         
                         if isinstance(value, int):
@@ -70,19 +83,21 @@ async def run(playwright: Playwright) -> None:
                         else: 
                                 await page.locator('[placeholder="Key"]').fill(value)
                                 await page.locator('[placeholder="Value"]').fill(value)              
-                                # desc = desc.capitalize()
                                 await page.locator('[placeholder="Description"]').fill(desc + ' = ' + value)
                         await page.locator('[id="foptnactive"]').select_option(label="Yes")
                         await page.locator('[class="btn btn-primary add_codemaster_btn"]').click()
                         await sleep(2)
                         
+                # Field Master Configuration        
                 await page.locator('text=Field Master').click()
                 await page.locator('[class="btn btn-primary pull-right add_user"]').click()
                 await page.locator('[placeholder="Code"]').fill(f'dd_{key}')
                 if isinstance(value,int):
+                        flag = True
                         last_Value = mydict[key][-1]
-                        text = ' less than ' 
-                        await page.locator('[placeholder="Name"]').fill(f'{desc}({text}{last_Value}) ')
+                        text = ' (less than ' + str(last_Value)+')'
+                        desc2=  f'{desc}{text}'
+                        await page.locator('[placeholder="Name"]').fill(desc2)
                         await page.locator('[id="fielddataType"]').select_option(label="integer")
                         if key.startswith('applicant1_'):
                                 await page.locator('[id="fieldlevel"]').select_option(label="Applicant")
@@ -93,24 +108,38 @@ async def run(playwright: Playwright) -> None:
                         await page.locator('[id="fielddataType"]').select_option(label="dropdown")
                         if key.startswith('applicant1_'):
                                 await page.locator('[id="fieldlevel"]').select_option(label="Applicant")
+                                try:
+                                        await page.locator('[id="fieldgroupcode"]').select_option(label=key)
+                                except: 
+                                        await page.locator('[id="fieldgroupcode"]').click()
+                                        await page.locator(f'text={key}').click()           
                         else:
                                 await page.locator('[id="fieldlevel"]').select_option(label="Aplication")
-                                await page.locator('[id="fieldgroupcode"]').select_option(key)
+                                await page.locator('[id="fieldgroupcode"]').select_option(label=key)
                 await page.locator('[id="fieldismandatory1"]').click()
                 await page.locator('[id="fieldactive"]').select_option(label="Yes")
                 await page.locator('[class="btn btn-primary add_fields_btn"]').click()
                 await sleep(2)
+                # Lender Mapping
                 await page.locator('text=Lender Mapping').click()
                 await page.locator('[class="btn btn-primary pull-right add_user"]').click()
                 await page.locator('[id="loan_category"]').select_option(label="Unsecured Loan")
-                try:
-                        await page.locator('[class="selectize-input items full has-options has-items"]').select_option(label="Aditya Birla Finance Ltd")
+                
+                try:    
+                        await page.locator('[id="loan_type"]').select_option(label="Business Loan (Self Employed)")
+                        await page.locator('[id="banklist_div"]').select_option(label="Aditya Birla Finance Ltd")
                 except:
                         pass
-                await page.locator('[id="fieldmapid"]').select_option(label=desc)
+                if flag:
+                        try:
+                                await page.locator('[id="fieldmapid"]').select_option(label=desc2)              
+                        except:
+                                pass
+                else:
+                        await page.locator('[id="fieldmapid"]').select_option(label=desc)
                 await page.locator('[id="lenmapsequno"]').fill(str(count))
                 count = count + 1
-                await page.locator('[id="lenmapactive"]').select_option(label="Yes")
+                await page.locator('[id="lenmapactive"]').select_option(label="Yes")        
                 await page.locator('[class="btn btn-primary add_lendermap_btn"]').click()
                 await sleep(2)
                         
